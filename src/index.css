@@ -492,3 +492,5 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 
 .badge-hot { display: inline-flex; align-items: center; gap: 4px; }
 .board-section-head .flame { flex-shrink: 0; }
+
+.chip-count { margin-left: 7px; padding-left: 7px; border-left: 1px solid currentColor; font-size: 11.5px; opacity: 0.75; }

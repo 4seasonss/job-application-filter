@@ -3,6 +3,7 @@ import FilterPanel from './FilterPanel.jsx';
 import JobCard from './JobCard.jsx';
 import Flame from './Flame.jsx';
 import { rank } from '../lib/scoring.js';
+import { isOutside } from '../lib/location.js';
 
 const PAGE_SIZE = 40;
 const HOT_PREVIEW = 10;
@@ -46,6 +47,10 @@ export default function JobBoard({
   const [newOnly, setNewOnly] = useState(false);
 
   const { matches, total, dropped } = useMemo(() => rank(jobs, config), [jobs, config]);
+
+  // How many postings the region toggle is standing between you and, counted
+  // across the whole feed so the number doesn't move as other filters change.
+  const abroadCount = useMemo(() => jobs.filter((job) => isOutside(job.location)).length, [jobs]);
 
   // Company names for autocomplete, most frequent first so the ones you are
   // likely to want to hide (the big recruiters) are the first suggestions.
@@ -132,6 +137,16 @@ export default function JobBoard({
           <option value="score">Best match</option>
           <option value="date">Newest</option>
         </select>
+        <button
+          type="button"
+          className={config.usCanadaOnly ? 'chip chip-on' : 'chip'}
+          aria-pressed={config.usCanadaOnly}
+          onClick={() => change({ usCanadaOnly: !config.usCanadaOnly })}
+          title="Hides postings located only outside the US and Canada. A posting that lists the US alongside other countries stays, and so does one with no country given."
+        >
+          US &amp; Canada only
+          {status === 'ready' && <span className="chip-count">{abroadCount} abroad</span>}
+        </button>
         <label className="check check-inline">
           <input
             type="checkbox"

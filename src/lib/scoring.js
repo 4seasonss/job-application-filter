@@ -10,6 +10,7 @@
 
 import { ROLE_PROFILES, MAX_POINTS_PER_PROFILE, SECONDARY_LANE_FACTOR } from '../config/profiles.js';
 import { matchesTerm } from './match.js';
+import { isOutside } from './location.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -30,6 +31,7 @@ function knockout(job, config, age) {
   if (config.companiesInclude?.length && !companyHit(config.companiesInclude))
     return 'Not one of your companies';
 
+  if (config.usCanadaOnly && isOutside(job.location)) return 'Outside the US and Canada';
   if (config.sponsorship === 'only_yes' && job.h1b !== 'yes')
     return 'Sponsorship not confirmed';
   if (config.sponsorship !== 'off' && job.h1b === 'no')

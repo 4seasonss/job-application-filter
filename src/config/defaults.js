@@ -30,6 +30,10 @@ export const DEFAULT_CONFIG = {
   newGradOnly: false,   // the tag is missing on ~70% of rows, so boost, don't gate
   workModels: [],       // empty means no restriction
   locations: [],        // substring match against the posting's location
+  // Hide postings located only outside the US and Canada. On by default; a
+  // posting that lists the US alongside other countries is kept, and so is one
+  // whose location gives no country to go on.
+  usCanadaOnly: true,
   companiesExclude: [], // never show these companies
   companiesInclude: [], // when non-empty, show ONLY these companies
   search: '',
@@ -47,6 +51,7 @@ export const PRESETS = {
   'F-1 / needs sponsorship': {},
   'US authorized': { sponsorship: 'off', excludeCitizenshipRequired: false },
   'Show everything': {
+    usCanadaOnly: false,
     sponsorship: 'off',
     excludeCitizenshipRequired: false,
     maxYearsExperience: 20,

@@ -105,6 +105,27 @@ within 30 minutes keeps the same baseline, otherwise the badges would vanish the
 moment you refreshed. The first ever visit shows no badges rather than marking
 everything new, and neither does a return after more than a week.
 
+## Region filter
+
+A **US & Canada only** button in the toolbar, on by default, hides postings located
+only outside those two countries (about 62 of 1,404 today, all UK, Australia and
+Ireland). Click it to turn it off; the choice is remembered, and the *Show
+everything* preset turns it off too.
+
+Locations are hand-typed free text, so [`src/lib/location.js`](src/lib/location.js)
+answers with a *set* of countries rather than one, and says "unknown" instead of
+guessing:
+
+- A posting that lists the US **alongside** other countries stays.
+- A posting whose location names no country stays if it carries a US state or
+  Canadian province ("Redmond, WA", "Chantilly, Virginia"), and stays if it says
+  nothing usable at all ("Multi Location", a bare "Toronto") — dropping on a guess
+  would hide jobs you are eligible for.
+- State codes only count when set off like one (after a comma, in capitals), so
+  "Hyderabad, IN, India" is India, not Indiana.
+
+To change which countries count, edit the `allowed` default in `isOutside`.
+
 ## Company filters
 
 **Never show** and **Only show** lists in the Companies section, plus a *Hide
@@ -271,6 +292,7 @@ src/server/freshness.js age of the newest posting, from a few job pages
 src/lib/enrich.js       requirements-text mining
 src/lib/seen.js         remembers what you've seen, for the New badge
 src/lib/match.js        boundary-aware keyword matching
+src/lib/location.js     which countries a location string names
 src/lib/scoring.js      knockouts + match points (pure, no React)
 src/lib/resume.js       in-browser PDF parsing + profile derivation
 src/lib/store/          localStorage persistence
