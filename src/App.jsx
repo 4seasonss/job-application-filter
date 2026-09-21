@@ -5,6 +5,7 @@ import JobBoard from './components/JobBoard.jsx';
 import { DEFAULT_CONFIG, mergeConfig } from './config/defaults.js';
 import { attachSearchText } from './lib/enrich.js';
 import { store, onboarding } from './lib/store/index.js';
+import { resolveSeen, loadSeen, saveSeen } from './lib/seen.js';
 import { useRoute } from './lib/router.js';
 
 export default function App() {
@@ -12,19 +13,28 @@ export default function App() {
   const [jobs, setJobs] = useState([]);
   const [status, setStatus] = useState('loading');
   const [fetchedAt, setFetchedAt] = useState(null);
+  const [newestPostedAt, setNewestPostedAt] = useState(null);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [ready, setReady] = useState(false);
+  const [newIds, setNewIds] = useState(null);
 
   // Postings load immediately, even on the landing page, so the board is
   // already populated by the time someone finishes onboarding.
   useEffect(() => {
     let live = true;
-    fetch('/api/jobs')
+    fetch('/api/jobs', { cache: 'no-cache' })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((data) => {
         if (!live) return;
-        setJobs(data.jobs.map(attachSearchText));
+        const list = data.jobs.map(attachSearchText);
+        // Which postings are new since the last visit. Done here, once per
+        // successful load, so a failed fetch never overwrites what we remembered.
+        const { newIds: fresh, next } = resolveSeen(loadSeen(), list.map((j) => j.id), Date.now());
+        saveSeen(next);
+        setNewIds(fresh);
+        setJobs(list);
         setFetchedAt(data.fetchedAt);
+        setNewestPostedAt(data.newestPostedAt ?? null);
         setStatus('ready');
       })
       .catch(() => live && setStatus('error'));
@@ -95,6 +105,8 @@ export default function App() {
           jobs={jobs}
           status={status}
           fetchedAt={fetchedAt}
+          newestPostedAt={newestPostedAt}
+          newIds={newIds}
           config={config}
           update={update}
           reset={reset}

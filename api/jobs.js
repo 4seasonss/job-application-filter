@@ -2,15 +2,21 @@
 //
 // Fetches the requested categories upstream, normalizes and enriches them, and
 // hands back plain JSON. There is deliberately no cron job and no database: the
-// CDN cache below is the sync mechanism. The first request after an hour
-// refreshes in the background while everyone else is served instantly, which
-// matches an upstream that aggregates hourly and keeps postings live for weeks.
+// CDN cache below is the sync mechanism.
+//
+// The cache is short and does NOT serve stale copies. An earlier version used
+// stale-while-revalidate, which is right for a busy site and wrong for a
+// personal one: with a visit every few hours, each visit was handed the
+// snapshot the previous visit had triggered, so the board always lagged by one
+// visit. Now an expired entry is refetched before responding (about 0.7s), so
+// what you see is never older than the TTL.
 
 import { fetchAirtableCategory } from '../src/server/airtable.js';
+import { fetchNewestPosted } from '../src/server/freshness.js';
 import { enrich } from '../src/lib/enrich.js';
 import { AIRTABLE_CATEGORIES, DEFAULT_CATEGORIES } from '../src/config/sources.js';
 
-const ONE_HOUR = 3600;
+const CACHE_SECONDS = 300;
 
 function send(res, status, body) {
   res.statusCode = status;
@@ -39,11 +45,17 @@ export default async function handler(req, res) {
       return enriched;
     });
 
-    res.setHeader(
-      'cache-control',
-      `public, s-maxage=${ONE_HOUR}, stale-while-revalidate=${ONE_HOUR * 24}`,
-    );
-    send(res, 200, { fetchedAt: new Date().toISOString(), categories: requested, jobs });
+    // Best effort and never fatal: a slow or challenged job page must not cost
+    // anyone the board, so any failure just means no freshness line.
+    const newestPostedAt = await fetchNewestPosted(jobs).catch(() => null);
+
+    res.setHeader('cache-control', `public, s-maxage=${CACHE_SECONDS}`);
+    send(res, 200, {
+      fetchedAt: new Date().toISOString(),
+      newestPostedAt,
+      categories: requested,
+      jobs,
+    });
   } catch (error) {
     // Upstream is an undocumented endpoint, so treat a failure as expected and
     // let the client fall back to whatever it already has.

@@ -69,6 +69,14 @@ function cellReader(columns, choices) {
   };
 }
 
+// Falls back to the text fields for any source whose apply links carry no id.
+function stableId(url, company, title, location) {
+  return (
+    url.match(/\/jobs\/info\/([0-9a-z]+)/i)?.[1] ??
+    [company, title, location].join('|').toLowerCase()
+  );
+}
+
 /** Fetch one category and return its rows in a source-agnostic shape. */
 export async function fetchAirtableCategory(key, { label, baseId, shareId }) {
   const session = await openSharedView({ baseId, shareId });
@@ -96,16 +104,25 @@ export async function fetchAirtableCategory(key, { label, baseId, shareId }) {
 
   return table.rows.map((row) => {
     const apply = read(row, 'Apply');
+    const url = typeof apply === 'object' ? (apply?.url ?? '') : '';
+    const company = read(row, 'Company') ?? '';
+    const title = read(row, 'Position Title') ?? '';
+    const location = read(row, 'Location') ?? '';
     return {
-      id: `${key}:${row.id}`,
+      // Upstream rebuilds the whole base regularly: every row shares one
+      // createdTime and Airtable record ids do not survive a rebuild. The apply
+      // link's job id does, and was unique across all 1,394 rows when checked,
+      // so identity comes from that. It is what lets us remember which postings
+      // you have already seen.
+      id: `${key}:${stableId(url, company, title, location)}`,
       category: key,
       categoryLabel: label,
-      title: read(row, 'Position Title') ?? '',
-      company: read(row, 'Company') ?? '',
-      location: read(row, 'Location') ?? '',
+      title,
+      company,
+      location,
       salary: read(row, 'Salary') ?? '',
       date: read(row, 'Date') ?? '',
-      url: typeof apply === 'object' ? (apply?.url ?? '') : '',
+      url,
       workModel: read(row, 'Work Model') ?? '',
       companySize: read(row, 'Company Size') ?? '',
       industries: read(row, 'Company Industry') ?? [],

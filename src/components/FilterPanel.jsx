@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ROLE_PROFILES } from '../config/profiles.js';
 import { DEFAULT_WEIGHTS, PRESETS } from '../config/defaults.js';
+import TagInput from './TagInput.jsx';
 
 const WORK_MODELS = ['On Site', 'Hybrid', 'Remote'];
 
@@ -38,7 +39,7 @@ function Section({ title, children, defaultOpen = true }) {
   );
 }
 
-export default function FilterPanel({ config, update, reset }) {
+export default function FilterPanel({ config, update, reset, companyOptions = [] }) {
   const toggleInList = (key, value) => {
     const list = config[key];
     update({ [key]: list.includes(value) ? list.filter((v) => v !== value) : [...list, value] });
@@ -58,7 +59,18 @@ export default function FilterPanel({ config, update, reset }) {
 
       <div className="presets">
         {Object.entries(PRESETS).map(([name, patch]) => (
-          <button key={name} type="button" className="preset" onClick={() => reset(patch)}>
+          <button
+            key={name}
+            type="button"
+            className="preset"
+            onClick={() =>
+              reset({
+                ...patch,
+                companiesInclude: config.companiesInclude,
+                companiesExclude: config.companiesExclude,
+              })
+            }
+          >
             {name}
           </button>
         ))}
@@ -162,6 +174,32 @@ export default function FilterPanel({ config, update, reset }) {
             }
           />
         </Field>
+      </Section>
+
+      <Section title="Companies">
+        <TagInput
+          label="Never show"
+          values={config.companiesExclude}
+          onChange={(companiesExclude) => update({ companiesExclude })}
+          placeholder="Add a company…"
+          listId="company-options"
+          tone="neg"
+          hint="Whole words: “Meta” hides Meta Platforms but not Metadata Inc. You can also hide a company straight from any job card."
+        />
+        <TagInput
+          label="Only show"
+          values={config.companiesInclude}
+          onChange={(companiesInclude) => update({ companiesInclude })}
+          placeholder="Any company"
+          listId="company-options"
+          tone="pos"
+          hint="When you add any, every other company is hidden. “Never show” wins if a company is in both."
+        />
+        <datalist id="company-options">
+          {companyOptions.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
       </Section>
 
       <Section title="What you're good at">

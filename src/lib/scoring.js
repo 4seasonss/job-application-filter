@@ -21,6 +21,15 @@ function daysSince(dateString, now) {
 
 /** First knockout that applies, or null when the posting survives. */
 function knockout(job, config, age) {
+  // Company rules come first: they are explicit intent, so when one fires it
+  // should be the reason shown rather than some incidental filter behind it.
+  // Matching is whole-word, so hiding "Meta" does not hide "Metadata Inc".
+  const companyHit = (list) => list.some((name) => matchesTerm(job.company, name));
+  if (config.companiesExclude?.length && companyHit(config.companiesExclude))
+    return 'Company hidden by you';
+  if (config.companiesInclude?.length && !companyHit(config.companiesInclude))
+    return 'Not one of your companies';
+
   if (config.sponsorship === 'only_yes' && job.h1b !== 'yes')
     return 'Sponsorship not confirmed';
   if (config.sponsorship !== 'off' && job.h1b === 'no')

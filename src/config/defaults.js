@@ -30,6 +30,8 @@ export const DEFAULT_CONFIG = {
   newGradOnly: false,   // the tag is missing on ~70% of rows, so boost, don't gate
   workModels: [],       // empty means no restriction
   locations: [],        // substring match against the posting's location
+  companiesExclude: [], // never show these companies
+  companiesInclude: [], // when non-empty, show ONLY these companies
   search: '',
 
   profiles: Object.fromEntries(

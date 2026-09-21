@@ -32,18 +32,87 @@ fix. Category IDs for all 23 upstream categories are in
 `/api/jobs` fetches upstream on demand and returns:
 
 ```
-Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400
+Cache-Control: public, s-maxage=300
 ```
 
-Vercel's CDN is the sync mechanism. The first request after an hour refreshes
-in the background while every other visitor is served instantly from cache, so
-nobody ever waits on the upstream fetch. No cron, no storage, no scheduled job
-to babysit.
+Vercel's CDN is the sync mechanism: a response is reused for five minutes, and
+after that the next request refetches upstream (about 0.7s) *before* answering.
+No cron, no storage, no scheduled job to babysit, and what you see is never more
+than five minutes older than the source.
 
-This is also *more* frequent than cron would give you: Vercel's Hobby tier
-limits cron jobs to roughly daily triggers, while cache revalidation has no such
-limit. And hourly is already generous — upstream aggregates hourly, but postings
-stay live for weeks.
+**Deliberately not `stale-while-revalidate`.** That is the usual recommendation
+and it is wrong for a site one person opens a few times a day. With it, an
+expired entry is served stale while a refresh runs behind it, so each visit was
+handed the snapshot the *previous* visit triggered — the board permanently
+lagged by one visit and looked frozen. Waiting 0.7s occasionally is a much
+better trade than a list that is always a visit behind.
+
+The frontend also fetches with `cache: 'no-cache'`, so the browser never reuses
+an older response either.
+
+## Is it recent? — the freshness line and the "today" count
+
+The top of the board answers that directly:
+
+```
+Newest posting: 16 min ago (2:58 PM ET)
+87 posted in the source today (ET, 2026-09-21) · 35 match your filters · 21 new since your last visit
+```
+
+- **Newest posting** is read from a real job page: the page each Apply link opens
+  carries an exact publish time (UTC), and [`src/server/freshness.js`](src/server/freshness.js)
+  takes the newest of the top ten rows. It ticks every minute, so it stays honest
+  on a tab left open. It is the number to trust for "is this feed alive".
+- **Posted in the source today** counts the feed's postings dated today in Eastern
+  time, *before* your filters. It should start near 0 after midnight and climb
+  (recent full days: Fri 209, Sat 141, Sun 135; Tue-Thu run 210-260). If it reads 0,
+  the line says what date the newest posting actually carries.
+- **Match your filters** is that same set after your filters, and it is the number
+  in the *Hot* section below.
+
+### The timezone detail
+
+Checked against exact publish times: the feed's `Date` column rolls over at
+**midnight Pacific**, not Eastern (11:58 PM PT is still the old date, 12:00 AM PT
+is the new one). Since "today" here is Eastern, the count restarts from 0 at
+midnight ET as you'd expect, then stays at 0 until 3 AM ET, when the feed starts
+dating new postings to the new day. Postings made between midnight and 3 AM ET are
+dated to the previous day and are not counted as today.
+
+### Why exact times aren't used for every job
+
+A "released in the last 24 hours" rule needs a publish time per job, and the feed
+only has a date. Reading the ~200 recent job pages would work once and then stop:
+jobright redirects to a security challenge after roughly 30 rapid requests (all but
+30 of 222 came back as the challenge page in testing). Working around that is bot-
+evasion, so the freshness line reads a handful of pages, remembers them (a publish
+time never changes, so steady state is only the rows that are new since the last
+refresh), and treats any failure as "no answer" instead of an error.
+
+## New and hot
+
+- **Hot.** Postings dated today (ET) get a *Hot* badge and their own section above
+  the rest.
+- **New since your last visit.** Postings this browser has not seen before get a
+  *New* badge, with a toggle to show only those.
+
+The second is a diff against what the browser saw last time, not a timestamp: the
+upstream base is rebuilt wholesale, so every row shares one `createdTime` and
+Airtable record ids do not survive a rebuild. The only stable identity is the job id
+inside the apply link (unique across all 1,394 rows when checked), so that is what
+[`src/lib/seen.js`](src/lib/seen.js) records. A "visit" is a session — reloading
+within 30 minutes keeps the same baseline, otherwise the badges would vanish the
+moment you refreshed. The first ever visit shows no badges rather than marking
+everything new, and neither does a return after more than a week.
+
+## Company filters
+
+**Never show** and **Only show** lists in the Companies section, plus a *Hide
+company* link on every card. Matching is whole-word, so hiding "Meta" hides Meta
+Platforms but not Metadata Inc. "Never show" wins when a company is in both.
+This matters more than it sounds: two recruiters (TikTok and ByteDance) account
+for around a fifth of a typical board, which crowds out everything else near the
+top of "Best match".
 
 ## The filtering model
 
@@ -198,13 +267,15 @@ services to configure.
 ```
 api/jobs.js             fetch + normalize + cache headers
 src/server/airtable.js  the upstream handshake (the fragile part)
+src/server/freshness.js age of the newest posting, from a few job pages
 src/lib/enrich.js       requirements-text mining
+src/lib/seen.js         remembers what you've seen, for the New badge
 src/lib/match.js        boundary-aware keyword matching
 src/lib/scoring.js      knockouts + match points (pure, no React)
 src/lib/resume.js       in-browser PDF parsing + profile derivation
 src/lib/store/          localStorage persistence
 src/config/             sources, role profiles, default config
-src/components/         Landing, Onboarding, JobBoard, FilterPanel, JobCard
+src/components/         Landing, Onboarding, JobBoard, FilterPanel, JobCard, TagInput
 ```
 
 ## Known limits

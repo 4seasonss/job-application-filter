@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Flame from './Flame.jsx';
 
 function scoreTone(score) {
   if (score >= 60) return 'strong';
@@ -11,7 +12,7 @@ const SPONSORSHIP_LABEL = {
   no: { text: 'No sponsorship', tone: 'neg' },
 };
 
-export default function JobCard({ result }) {
+export default function JobCard({ result, hot = false, fresh = false, onHideCompany }) {
   const [open, setOpen] = useState(false);
   const { job, score, reasons } = result;
   const sponsorship = SPONSORSHIP_LABEL[job.h1b] ?? { text: 'Sponsorship unknown', tone: 'unknown' };
@@ -33,6 +34,12 @@ export default function JobCard({ result }) {
       </div>
 
       <div className="facts">
+        {hot && (
+          <span className="badge badge-hot">
+            <Flame /> Hot · posted today
+          </span>
+        )}
+        {fresh && <span className="badge badge-new">New since your last visit</span>}
         {job.workModel && <span className="fact">{job.workModel}</span>}
         {job.salary && <span className="fact">{job.salary}</span>}
         {job.isNewGrad && <span className="fact fact-pos">New grad</span>}
@@ -61,6 +68,16 @@ export default function JobCard({ result }) {
         {job.qualifications && (
           <button type="button" className="link-button" onClick={() => setOpen(!open)}>
             {open ? 'Hide requirements' : 'Requirements'}
+          </button>
+        )}
+        {job.company && onHideCompany && (
+          <button
+            type="button"
+            className="link-button link-muted hide-company"
+            title={`Never show postings from ${job.company}`}
+            onClick={() => onHideCompany(job.company)}
+          >
+            Hide {job.company}
           </button>
         )}
       </div>
